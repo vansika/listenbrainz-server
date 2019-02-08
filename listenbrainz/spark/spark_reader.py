@@ -5,7 +5,8 @@ import time
 import ujson
 
 from flask import current_app
-from listenbrainz import db, stats, utils
+from listenbrainz import utils
+from listenbrainz.db import user as db_user, stats as db_stats
 from listenbrainz.webserver import create_app
 from listenbrainz.db.exceptions import DatabaseException
 from listenbrainz import config
@@ -31,34 +32,19 @@ class SparkReader:
             error_logger=current_app.logger.error,
         )
 
-    def get_id(self, user_name):
-
-        with db.engine.connect() as connection:
-            result = connection.execute(sqlalchemy.text("""
-                SELECT id
-                FROM "user"
-                WHERE LOWER(musicbrainz_id) = LOWER(:mb_id)
-                """), {"mb_id": user_name,})
-            row = result.fetchone()
-            return dict(row) if row else None
-
 
     def callback(self, ch, method, properties, body):
         """ Handle the data received from the queue and works accordingly.
         """
         data = ujson.loads(body)
-        user_id = self.get_id(data[0]['user_name']) 
-        artist = {}
-        release = {}
-        recording = {}
-        for member in data:
-        	if member['artist_name'] not in artist:
-        		artist[member['artist_name']] = {'artist_msid': member['artist_msid'], 'artist_mbids' : member['artist_mbids']}
-        	if member['release_name'] and member['release_name'] not in release:
-        		release[member['release_name']] = {'release_msid': member['release_msid'], 'release_mbid' : member['release_mbid']}
-        	if member['track_name'] not in recording:
-        		recording[member['track_name']] = {'recording_msid': member['recording_msid'], 'recording_mbid' : member['recording_mbid']}
-        db.stats.insert_user_stats(user_id['id'], artist, recording, release, 0)
+        user_name = next(iter(data[0]))
+        user = db_user.get_by_mb_id(user_name)
+        artists = data[0][user_name]['artists']['artist_stats']
+        recordings = data[0][user_name]['recordings']
+        releases = data[0][user_name]['releases']
+        artist_count = data[0][user_name]['artists']['artist_count']
+        db_stats.insert_user_stats(user['id'], artists, recordings, releases, artist_count)
+        print ("data for {} published".format(user_name))
 
         while True:
             try:
