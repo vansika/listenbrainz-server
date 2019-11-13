@@ -24,13 +24,21 @@ from pyspark.mllib.recommendation import MatrixFactorizationModel
 # Recommendation HTML is generated if set to true.
 SAVE_RECOMMENDATION_HTML = True
 
-def load_model(path):
+def load_model():
     """ Load best model from given path in HDFS.
-
-        Args:
-            path (str): Path where best model is stored.
     """
-    return MatrixFactorizationModel.load(listenbrainz_spark.context, path)
+    try:
+        model_index_df = utils.read_files_from_HDFS(path.INDEX)
+    except PathNotFoundException as err:
+        current_app.logger.error(str(err), exc_info=True)
+        sys.exit(-1)
+    except FileNotFetchedException as err:
+        current_app.logger.error(str(err), exc_info=True)
+        sys.exit(-1)
+
+    best_model_id = model_index_df.select('*').take(1)[0].model_id
+    df_path = config.HDFS_CLUSTER_URI + path.DATA_DIR + '/' + best_model_id
+    return MatrixFactorizationModel.load(listenbrainz_spark.context, df_path)
 
 def get_recommended_recordings(candidate_set, limit, recordings_df, model):
     """ Get list of recommended recordings from the candidate set
@@ -229,15 +237,12 @@ def main():
     metadata_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'recommendation-metadata.json')
     with open(metadata_file_path, 'r') as f:
         recommendation_metadata = json.load(f)
-        best_model_id = recommendation_metadata['best_model_id']
         user_names = recommendation_metadata['user_name']
-
-    best_model_path = path.DATA_DIR + '/' + best_model_id
 
     current_app.logger.info('Loading model...')
     t0 = time()
     try:
-        model = load_model(config.HDFS_CLUSTER_URI + best_model_path)
+        model = load_model()
     except Py4JJavaError as err:
         current_app.logger.error('Unable to load model "{}"\n{}\nAborting...'.format(best_model_id, str(err.java_exception)),
             exc_info=True)

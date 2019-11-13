@@ -2,6 +2,9 @@ import os
 
 from listenbrainz_spark import config
 
+# Note: When accessing HDFS files/folders using spark context always use config.HDFS_CLUTER_URI.
+# When accessing HDFS files/folders using HDFS client specify the path as such.
+
 # Parent directory containing listens and data driven from ListenBrainz.
 LISTENBRAINZ_DATA_DIRECTORY = os.path.join('/', 'data', 'listenbrainz')
 # Directory containing similar artist relation.
@@ -36,5 +39,9 @@ SIMILAR_ARTIST_CANDIDATE_SET = config.HDFS_CLUSTER_URI + CANDIDATE_SET_DIR + '/'
 MODEL_METADATA = config.HDFS_CLUSTER_URI + MODEL_DIR + '/' + 'model_metadata.parquet'
 # Absolute path to save model index
 INDEX = config.HDFS_CLUSTER_URI + MODEL_DIR + '/' + 'index.parquet'
+# Absolute path to save dataframe metadata
+DATAFRAME_METADATA = config.HDFS_CLUSTER_URI + DATAFRAME_DIR + '/' + 'dataframe_metadata.parquet'
+# Absolute path to save model ids of deleted models.
+DELETED_MODELS = config.HDFS_CLUSTER_URI + MODEL_DIR + '/' + 'deleted.parquet'
 
 
