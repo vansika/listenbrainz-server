@@ -50,3 +50,8 @@ LOG_SENTRY = {
 # String + UUID
 # The following var defines the string of which the model id is made up of.
 MODEL_ID_PREFIX = 'listenbrainz-recommendation-model'
+
+# Dataframe id is made up of two parts.
+# String + UUID
+# The following var defines the string of which the dataframe id is made up of.
+DATAFRAME_ID_PREFIX = 'listenbrainz-recommendation-dataframe'

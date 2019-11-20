@@ -19,10 +19,10 @@ from pyspark.sql.utils import AnalysisException
 # dataframe html is generated when set to true
 SAVE_DATAFRAME_HTML = False
 
-def generate_best_model_id(metadata):
-    """ Generate best model id.
+def generate_dataframe_id(metadata):
+    """ Generate dataframe id.
     """
-    metadata['model_id'] = '{}-{}'.format(config.MODEL_ID_PREFIX, uuid.uuid4())
+    metadata['dataframe_id'] = '{}-{}'.format(config.DATAFRAME_ID_PREFIX, uuid.uuid4())
 
 def save_dataframe_html(users_df_time, recordings_df_time, playcounts_df_time, total_time):
     """ Prepare and save dataframe HTML.
@@ -54,6 +54,7 @@ def save_dataframe_metadata_to_HDFS(metadata):
     except DataFrameNotCreatedException as err:
         current_app.logger.error(str(err), exc_info=True)
         sys.exit(-1)
+
     try:
         # Append the dataframe to existing dataframe if already exist or create a new one.
         utils.append(dataframe_metadata, path.DATAFRAME_METADATA)
@@ -178,9 +179,8 @@ def main():
     playcounts_df_time = '{:.2f}'.format((time() - t0) / 60)
     total_time = '{:.2f}'.format((time() - ti) / 60)
 
-    generate_best_model_id(metadata)
+    generate_dataframe_id(metadata)
     # timestamp when the dataframes are saved in HDFS.
-    metadata['dataframe_created'] = datetime.utcnow()
     save_dataframe_metadata_to_HDFS(metadata)
 
     if SAVE_DATAFRAME_HTML:
