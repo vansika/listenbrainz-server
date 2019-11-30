@@ -53,12 +53,12 @@ def compute_rmse(model, data, n):
     return sqrt(predictionsAndRatings.map(lambda x: (x[0] - x[1]) ** 2).reduce(add) / float(n))
 
 def generate_model_id():
-    """ Generate best model id.
+    """ Generate a new model id.
     """
     return '{}-{}'.format(config.MODEL_ID_PREFIX, uuid.uuid4())
 
 def get_dataframe_id(dataframe_metadata_df, best_model_metadata):
-    """ Get dataframe id of datafsets on which model is trained from dataframe metadata.
+    """ Get dataframe id of datasets on which model is trained from dataframe metadata.
 
         Args:
             dataframe_metadata_df (dataframe): Refer to listenbrainz_spark.schema.dataframe_metadata_schema
@@ -292,12 +292,12 @@ def main():
     current_app.logger.info('Training models...')
     t0 = time()
 
-    model, model_metadata, best_model_metadata = train(training_data, validation_data, num_validation,
+    best_model, model_metadata, best_model_metadata = train(training_data, validation_data, num_validation,
         config.RANKS, config.LAMBDAS, config.ITERATIONS)
     models_training_time = '{:.2f}'.format((time() - t0) / 3600)
 
     try:
-        best_model_metadata['test_rmse'] = compute_rmse(model.model, test_data, num_test)
+        best_model_metadata['test_rmse'] = compute_rmse(best_model.model, test_data, num_test)
     except Py4JJavaError as err:
         current_app.logger.error('Root mean squared error for best model for test data not computed\n{}\nAborting...'\
             .format(str(err.java_exception)), exc_info=True)
@@ -314,7 +314,7 @@ def main():
 
     hdfs_connection.init_hdfs(config.HDFS_HTTP_URI)
     t0 = time()
-    save_model_and_metadata(model.model, best_model_metadata)
+    save_model_and_metadata(best_model.model, best_model_metadata)
     time_['save_model'] = '{:.2f}'.format((time() - t0) / 60)
 
     # Delete checkpoint dir as saved lineages would eat up space, we won't be using them anyway.
