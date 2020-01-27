@@ -65,13 +65,13 @@ def get_recommended_recordings(candidate_set, limit, recordings_df, model, mappe
     # get the track_name and artist_name to make the HTML redable. This step will not be required when sending recommendations
     # to lemmy since gids are enough to recognize the track.
     recommendations_df = df.join(mapped_listens, ['mb_artist_credit_id', 'mb_recording_mbid']) \
-        .select('artist_name', 'mb_artist_credit_id', 'mb_artist_credit_mbids', 'msb_artist_msid', 'mb_recording_mbid', \
-            'msb_recording_msid', 'mb_release_mbid', 'msb_release_msid', 'release_name', 'track_name').distinct()
+        .select('artist_name', 'mb_artist_credit_id', 'mb_artist_credit_mbids', 'mb_recording_mbid', \
+            'mb_release_mbid', 'release_name', 'track_name').distinct()
 
     recommended_recordings = []
     for row in recommendations_df.collect():
-        rec = (row.artist_name, row.mb_artist_credit_id, row.mb_artist_credit_mbids, row.msb_artist_msid,
-            row.mb_recording_mbid, row.msb_recording_msid, mb_release_mbid, row.msb_release_msid, row.release_name, row.track_name)
+        rec = (row.artist_name, row.mb_artist_credit_id, row.mb_artist_credit_mbids, row.mb_recording_mbid,
+            row.mb_release_mbid, row.release_name, row.track_name)
         recommended_recordings.append(rec)
     return recommended_recordings
 
@@ -203,8 +203,8 @@ def get_recommendation_html(recommendations, time_, best_model_id, ti):
     """
     date = datetime.utcnow().strftime('%Y-%m-%d')
     recommendation_html = 'Recommendation-{}-{}.html'.format(uuid.uuid4(), date)
-    column = ('ARTIST_NAME', 'MB_ARTIST_CREDIT_ID', 'MB_ARTIST_CREDIT_MBIDS', 'MSB_ARTIST_MSID', 'MB_RECORDING_MBID',
-        'MSB_RECORDING_MSID', 'MB_RELEASE_MBID', 'MSB_RELEASE_MSID', 'RELEASE_NAME', 'TRACK_NAME')
+    column = ('ARTIST_NAME', 'MB_ARTIST_CREDIT_ID', 'MB_ARTIST_CREDIT_MBIDS', 'MB_RECORDING_MBID',
+        'MB_RELEASE_MBID', 'RELEASE_NAME', 'TRACK_NAME')
     context = {
         'recommendations' : recommendations,
         'column' : column,
