@@ -22,35 +22,38 @@ listen_schema = [
 
 # schema to contain model parameters.
 model_param_schema = [
-    StructField('alpha', FloatType(), nullable=True), # Baseline level of confidence weighting applied.
-    StructField('lmbda', FloatType(), nullable=True), # Controls over fitting.
-    StructField('num_iterations', IntegerType(), nullable=True), # Number of iterations to run.
-    StructField('rank', IntegerType(), nullable=True), # Number of hidden features in our low-rank approximation matrices.
+    StructField('alpha', FloatType(), nullable=False), # Baseline level of confidence weighting applied.
+    StructField('lmbda', FloatType(), nullable=False), # Controls over fitting.
+    StructField('iteration', IntegerType(), nullable=False), # Number of iterations to run.
+    StructField('rank', IntegerType(), nullable=False), # Number of hidden features in our low-rank approximation matrices.
 ]
 
 model_param_schema = StructType(sorted(model_param_schema, key=lambda field: field.name))
 
-model_metadata_schema = [
+dataframe_metadata_schema = [
     StructField('dataframe_created', TimestampType(), nullable=False), # Timestamp when dataframes are created and saved in HDFS.
+    StructField('dataframe_id', StringType(), nullable=False), # dataframe id or identification string of dataframe.
     # Timestamp from when listens have been used to train, validate and test the model.
     StructField('from_date', TimestampType(), nullable=False),
     # Number of listens recorded in a given time frame (between from_date and to_date, both inclusive).
     StructField('listens_count', IntegerType(), nullable=False),
-    StructField('model_created', TimestampType(), nullable=True), # Timestamp when the model is saved in HDFS.
-    StructField('model_deleted', TimestampType(), nullable=True), # Timestamp when the model is deleted from HDFS.
-    StructField('model_id', StringType(), nullable=False), # Model id or identification string of best model.
-    StructField('model_param', model_param_schema, nullable=True), # Parameters used to train the model.
     StructField('playcounts_count', IntegerType(), nullable=False), # Summation of training data, validation data and test data.
     StructField('recordings_count', IntegerType(), nullable=False), # Number of distinct recordings heard in a given time frame.
-    StructField('test_data_count', IntegerType(), nullable=True), # Number of listens used to test the model.
-    StructField('test_rmse', FloatType(), nullable=True), # Root mean squared error for test data.
     # Timestamp till when listens have been used to train, validate and test the model.
     StructField('to_date', TimestampType(), nullable=False),
-    StructField('training_data_count', IntegerType(), nullable=True), # Number of listens used to train the model.
-    StructField('updated', BooleanType(), nullable=False), # false by default, set to true when all other fields are non empty.
     StructField('users_count', IntegerType(), nullable=False), # Number of users active in a given time frame.
-    StructField('validation_data_count', IntegerType(), nullable=True), # Number of listens used to validate the model.
-    StructField('validation_rmse', FloatType(), nullable=True), # Root mean squared error for validation data.
+]
+
+model_metadata_schema = [
+    StructField('dataframe_id', StringType(), nullable=False), # dataframe id or identification string of dataframe.
+    StructField('model_created', TimestampType(), nullable=False), # Timestamp when the model is saved in HDFS.
+    StructField('model_param', model_param_schema, nullable=False), # Parameters used to train the model.
+    StructField('model_id', StringType(), nullable=False), # Model id or identification string of best model.
+    StructField('test_data_count', IntegerType(), nullable=False), # Number of listens used to test the model.
+    StructField('test_rmse', FloatType(), nullable=False), # Root mean squared error for test data.
+    StructField('training_data_count', IntegerType(), nullable=False), # Number of listens used to train the model.
+    StructField('validation_data_count', IntegerType(), nullable=False), # Number of listens used to validate the model.
+    StructField('validation_rmse', FloatType(), nullable=False), # Root mean squared error for validation data.
 ]
 
 msid_mbid_mapping_schema = [
@@ -81,6 +84,7 @@ artist_relation_schema =[
 # errors due to type mismatches when creating DataFrames using the schema
 # Although, we try to keep it sorted in the actual definition itself, we
 # also sort it programmatically just in case
+dataframe_metadata_schema = StructType(sorted(dataframe_metadata_schema, key=lambda field: field.name))
 listen_schema = StructType(sorted(listen_schema, key=lambda field: field.name))
 model_metadata_schema = StructType(sorted(model_metadata_schema, key=lambda field: field.name))
 msid_mbid_mapping_schema = StructType(sorted(msid_mbid_mapping_schema, key=lambda field: field.name))
@@ -111,6 +115,27 @@ def convert_listen_to_row(listen):
         tags=meta['additional_info'].get('tags', []),
     )
 
+def convert_dataframe_metadata_to_row(meta):
+    """ Convert dataframe metadata to a pyspark.sql.Row object.
+
+        Args:
+            meta (dict): a single dictionary representing model metadata.
+
+        Returns:
+            pyspark.sql.Row object - a Spark SQL Row based on the defined dataframe metadata schema.
+    """
+    return Row(
+        dataframe_created=datetime.utcnow(),
+        dataframe_id=meta.get('dataframe_id'),
+        from_date=meta.get('from_date'),
+        listens_count=meta.get('listens_count'),
+        playcounts_count=meta.get('playcounts_count'),
+        recordings_count=meta.get('recordings_count'),
+        to_date=meta.get('to_date'),
+        users_count=meta.get('users_count'),
+    )
+
+
 def convert_model_metadata_to_row(meta):
     """ Convert model metadata to row object.
 
@@ -121,26 +146,18 @@ def convert_model_metadata_to_row(meta):
         pyspark.sql.Row object - A Spark SQL row.
     """
     return Row(
-        dataframe_created=datetime.utcnow(),
-        from_date=meta.get('from_date'),
-        listens_count=meta.get('listens_count'),
-        model_created=meta.get('model_created'),
-        model_deleted=meta.get('model_deleted'),
+        dataframe_id=meta.get('dataframe_id'),
+        model_created=datetime.utcnow(),
         model_id=meta.get('model_id'),
         model_param=Row(
             alpha=meta.get('alpha'),
             lmbda=meta.get('lmbda'),
-            num_iterations=meta.get('num_iterations'),
+            iteration=meta.get('iteration'),
             rank=meta.get('rank'),
         ),
-        playcounts_count=meta.get('playcounts_count'),
-        recordings_count=meta.get('recordings_count'),
         test_data_count=meta.get('test_data_count'),
         test_rmse=meta.get('test_rmse'),
-        to_date=meta.get('to_date'),
         training_data_count=meta.get('training_data_count'),
-        updated=meta.get('updated'),
-        users_count=meta.get('users_count'),
         validation_data_count=meta.get('validation_data_count'),
         validation_rmse=meta.get('validation_rmse'),
     )

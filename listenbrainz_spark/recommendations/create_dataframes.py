@@ -56,10 +56,11 @@ SAVE_DATAFRAME_HTML = True
 #       'user_id', 'recording_id', 'count'
 #   ]
 
-def generate_best_model_id(metadata):
-    """ Generate best model id.
+
+def generate_dataframe_id(metadata):
+    """ Generate dataframe id.
     """
-    metadata['model_id'] = '{}-{}'.format(config.MODEL_ID_PREFIX, uuid.uuid4())
+    metadata['dataframe_id'] = '{}-{}'.format(config.DATAFRAME_ID_PREFIX, uuid.uuid4())
 
 
 def save_dataframe(df, dest_path):
@@ -96,28 +97,30 @@ def save_dataframe_html(users_df_time, recordings_df_time, playcounts_df_time, t
     save_html(queries_html, context, 'queries.html')
 
 
-def save_dataframe_metadata_to_HDFS(metadata):
-    """ Save dataframe metadata to model_metadata dataframe.
+def save_dataframe_metadata_to_hdfs(metadata):
+    """ Save dataframe metadata.
     """
     # Convert metadata to row object.
-    metadata_row = schema.convert_model_metadata_to_row(metadata)
+    metadata_row = schema.convert_dataframe_metadata_to_row(metadata)
     try:
         # Create dataframe from the row object.
-        dataframe_metadata = utils.create_dataframe(metadata_row, schema.model_metadata_schema)
+        dataframe_metadata = utils.create_dataframe(metadata_row, schema.dataframe_metadata_schema)
     except DataFrameNotCreatedException as err:
         current_app.logger.error(str(err), exc_info=True)
         sys.exit(-1)
 
     try:
-        # Append the dataframe to existing dataframe if already exist or create a new one.
-        utils.append(dataframe_metadata, path.MODEL_METADATA)
+        # Append the dataframe to existing dataframe if already exists or create a new one.
+        utils.append(dataframe_metadata, path.DATAFRAME_METADATA)
     except DataFrameNotAppendedException as err:
         current_app.logger.error(str(err), exc_info=True)
         sys.exit(-1)
+    df = utils.read_files_from_HDFS(path.DATAFRAME_METADATA)
 
-
-def get_dates_to_train_data(train_model_window):
-    """ Get window to fetch listens to train data.
+    for row in df.collect():
+        print(row)
+def get_dates_to_fetch_listens_to_train(train_model_window, metadata):
+    """ Get window to fetch listens to train model.
 
         Args:
             train_model_window (int): model to be trained on data of given number of days.
@@ -130,10 +133,13 @@ def get_dates_to_train_data(train_model_window):
     from_date = stats.adjust_days(to_date, train_model_window)
     # shift to the first of the month
     from_date = stats.replace_days(from_date, 1)
+
+    metadata['to_date'] = to_date
+    metadata['from_date'] = from_date
     return to_date, from_date
 
 
-def get_listens_for_training_model_window(to_date, from_date, metadata, dest_path):
+def get_listens_for_training_model(to_date, from_date, dest_path):
     """  Prepare dataframe of listens of X days to train.
 
         Args:
@@ -144,8 +150,6 @@ def get_listens_for_training_model_window(to_date, from_date, metadata, dest_pat
         Returns:
             partial_listens_df (dataframe): listens without artist mbid and recording mbid.
     """
-    metadata['to_date'] = to_date
-    metadata['from_date'] = from_date
     try:
         training_df = utils.get_listens(from_date, to_date, dest_path)
     except ValueError as err:
@@ -193,6 +197,7 @@ def get_playcounts_df(listens_df, recordings_df, users_df, metadata):
             recordings_df : Dataframe containing distinct recordings and corresponding
                                        mbids and names.
             users_df : Dataframe containing user names and user ids.
+            metadata: Dict containing dataframe metdata.
 
         Returns:
             playcounts_df: Dataframe containing play(listen) counts of users.
@@ -215,6 +220,7 @@ def get_listens_df(mapped_listens, metadata):
 
         Args:
             mapped_listens (dataframe): listens mapped with msid_mbid_mapping.
+            metadata: Dict containing dataframe metdata.
 
         Returns:
             listens_df : Dataframe containing recording_mbids corresponding to a user.
@@ -229,6 +235,7 @@ def get_recordings_df(mapped_listens, metadata):
 
         Args:
             mapped_listens (dataframe): listens mapped with msid_mbid_mapping.
+            metadata: Dict containing dataframe metdata.
 
         Returns:
             recordings_df: Dataframe containing distinct recordings and corresponding
@@ -251,6 +258,7 @@ def get_users_dataframe(mapped_listens, metadata):
 
         Args:
             mapped_listens (dataframe): listens mapped with msid_mbid_mapping.
+            metadata: Dict containing dataframe metdata.
 
         Returns:
             users_df : Dataframe containing user names and user ids.
@@ -273,18 +281,16 @@ def main(train_model_window=None):
         sys.exit(-1)
 
     ti = time()
-    # dict to save dataframe metadata which would be later merged in model_metadata dataframe.
+    # dict to save dataframe metadata.
     metadata = {}
-    # "updated" should always be set to False in this script.
-    metadata['updated'] = False
     try:
         listenbrainz_spark.init_spark_session('Create Dataframes')
     except SparkSessionNotInitializedException as err:
         current_app.logger.error(str(err), exc_info=True)
         sys.exit(-1)
 
-    to_date, from_date = get_dates_to_train_data(train_model_window)
-    partial_listens_df = get_listens_for_training_model_window(to_date, from_date, metadata, path.LISTENBRAINZ_DATA_DIRECTORY)
+    to_date, from_date = get_dates_to_fetch_listens_to_train(train_model_window, metadata)
+    partial_listens_df = get_listens_for_training_model(to_date, from_date, path.LISTENBRAINZ_DATA_DIRECTORY)
 
     # Dataframe containing recording msid->mbid and artist msid->mbid mapping.
     recording_artist_mapping_df = utils.read_files_from_HDFS(path.MBID_MSID_MAPPING)
@@ -308,8 +314,8 @@ def main(train_model_window=None):
     playcounts_df = get_playcounts_df(listens_df, recordings_df, users_df, metadata)
     playcounts_df_time = '{:.2f}'.format((time() - t0) / 60)
 
-    generate_best_model_id(metadata)
-    save_dataframe_metadata_to_HDFS(metadata)
+    generate_dataframe_id(metadata)
+    save_dataframe_metadata_to_hdfs(metadata)
     total_time = '{:.2f}'.format((time() - ti) / 60)
 
     if SAVE_DATAFRAME_HTML:

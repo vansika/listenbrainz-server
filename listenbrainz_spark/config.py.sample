@@ -16,10 +16,11 @@ SPARK_REQUEST_QUEUE = "spark_request"
 SPARK_RESULT_EXCHANGE = "spark_result"
 SPARK_RESULT_QUEUE = "spark_result"
 
-# train model
+# train model params
 RANKS = [8, 12]
 LAMBDAS = [0.1, 10.0]
 ITERATIONS = [5, 10]
+ALPHA = 3.0
 
 # train model on X days data
 TRAIN_MODEL_WINDOW = 180
@@ -50,6 +51,11 @@ SENTRY_DSN_PUBLIC = ''
 # String + UUID
 # The following var defines the string of which the model id is made up of.
 MODEL_ID_PREFIX = 'listenbrainz-recommendation-model'
+
+# Dataframe id is made up of two parts.
+# String + UUID
+# The following var defines the string of which the dataframe id is made up of.
+DATAFRAME_ID_PREFIX = 'listenbrainz-recommendation-dataframe'
 
 FTP_SERVER_URI = 'ftp.eu.metabrainz.org'
 FTP_MSID_MBID_DIR = '/pub/musicbrainz/listenbrainz/labs/mappings/msid-mbid-mapping-with-matchable/'
